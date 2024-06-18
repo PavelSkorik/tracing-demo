@@ -5,6 +5,7 @@ using OpenTelemetry.Trace;
 // ReSharper disable MoveLocalFunctionAfterJumpStatement
 // ReSharper disable once AccessToDisposedClosure
 
+// Add tracing
 const string appName = "ConsoleApp"; 
 var activitySource = new ActivitySource(appName);
 var resourceBuilder = ResourceBuilder.CreateDefault().AddService(serviceName: appName);
@@ -23,6 +24,7 @@ void RunMainJob()
     using var activity = activitySource.StartActivity(name: nameof(RunMainJob));
     RunShortTimeJob();
     RunLongTimeJob();
+    SendRequestToWebApi();
 }
 
 // child span1
@@ -41,7 +43,18 @@ void RunLongTimeJob()
     Thread.Sleep(2000);
     using var httpClient = new HttpClient();
     var result = httpClient.GetStringAsync("https://catfact.ninja/fact").GetAwaiter().GetResult();
-    activity?.SetTag("result", result);
+    activity?.SetTag("cat_facts", result);
+}
+
+// child span3
+void SendRequestToWebApi()
+{
+    using var activity = activitySource.StartActivity(name: nameof(SendRequestToWebApi));
+    
+    Thread.Sleep(2000);
+    using var httpClient = new HttpClient();
+    var result = httpClient.GetStringAsync("http://localhost:5264/weatherforecast").GetAwaiter().GetResult();
+    activity?.SetTag("weatherforecast", result);
 }
 
 #endregion

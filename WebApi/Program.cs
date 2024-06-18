@@ -1,9 +1,24 @@
+using System.Diagnostics;
+using System.Text.Json;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add tracing
+const string appName = "WebApi";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName: appName))
+    .WithTracing(traceProviderBuilder => traceProviderBuilder
+        .AddSource(appName)
+        .AddOtlpExporter()
+        .AddAspNetCoreInstrumentation(o => o.RecordException = true)
+    );
 
 var app = builder.Build();
 
@@ -23,6 +38,9 @@ var summaries = new[]
 
 app.MapGet("/weatherforecast", () =>
     {
+        using (var activity = Activity.Current?.Source.StartActivity("Sleep"))
+            Thread.Sleep(1000);
+        
         var forecast = Enumerable.Range(1, 5).Select(index =>
                 new WeatherForecast
                 (
@@ -31,6 +49,8 @@ app.MapGet("/weatherforecast", () =>
                     summaries[Random.Shared.Next(summaries.Length)]
                 ))
             .ToArray();
+        
+        Activity.Current?.AddTag("forecast", JsonSerializer.Serialize(forecast));
         return forecast;
     })
     .WithName("GetWeatherForecast")
